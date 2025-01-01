@@ -13,6 +13,16 @@ func (r *Runner) BLockListener(addr string, curr string) {
 	if err != nil {
 		log.Printf("Failed to fetch the latest block: %v", err)
 	}
+
+	if lastReleasedBlock == nil {
+		log.Println("Block is nil, unable to process")
+		return
+	}
+
+	if lastReleasedBlock.Number() == nil {
+		log.Println("Block number is nil")
+		return
+	}
 	log.Printf("Last released block: %d", lastReleasedBlock.Number().Int64())
 
 	lastBlockInDB, err := r.Ucase.Repository.GetLastBlockFromDB()

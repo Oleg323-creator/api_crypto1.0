@@ -11,12 +11,13 @@ type DataToSave struct {
 	PrivateKey string
 	Address    string
 	Currency   string
+	Nonce      string
 }
 
 func (r *Repository) SaveNewAddrToDB(data DataToSave) error {
 	queryBuilder := squirrel.Insert("addresses").
-		Columns("private_key", "address", "Currency").
-		Values(data.PrivateKey, data.Address, data.Currency)
+		Columns("private_key", "address", "Currency", "Nonce").
+		Values(data.PrivateKey, data.Address, data.Currency, data.Nonce)
 
 	query, args, err := queryBuilder.PlaceholderFormat(squirrel.Dollar).ToSql()
 	if err != nil {
@@ -69,26 +70,27 @@ func (r *Repository) GetAllAddrFromDB() ([]string, []string, error) {
 	return addresses, currencyes, nil
 }
 
-func (r *Repository) GetPrivateKeyFromDB(addr string) (string, error) {
-	queryBuilder := squirrel.Select("private_key").
+func (r *Repository) GetPrivateKeyFromDB(addr string) (string, string, error) {
+	queryBuilder := squirrel.Select("private_key", "nonce").
 		From("addresses").
 		Where(squirrel.Eq{"address": addr})
 
 	query, args, err := queryBuilder.PlaceholderFormat(squirrel.Dollar).ToSql()
 	if err != nil {
-		return "", fmt.Errorf("failed to build SQL query: %v", err)
+		return "", "", fmt.Errorf("failed to build SQL query: %v", err)
 	}
 
 	rows, execErr := r.DB.Query(query, args...)
 	if execErr != nil {
-		return "", fmt.Errorf("failed to execute SQL query: %v", execErr)
+		return "", "", fmt.Errorf("failed to execute SQL query: %v", execErr)
 	}
 	defer rows.Close()
 
 	var key string
+	var nonce string
 	if rows.Next() {
-		if err = rows.Scan(&key); err != nil {
-			return "", fmt.Errorf("failed to scan result: %v", err)
+		if err = rows.Scan(&key, &nonce); err != nil {
+			return "", "", fmt.Errorf("failed to scan result: %v", err)
 		}
 	}
 
@@ -96,5 +98,5 @@ func (r *Repository) GetPrivateKeyFromDB(addr string) (string, error) {
 		log.Fatal(err)
 	}
 
-	return key, nil
+	return key, nonce, nil
 }

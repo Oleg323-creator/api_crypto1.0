@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"api_crypto1.0/internal/db/repository"
-	"encoding/base64"
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joho/godotenv"
@@ -33,17 +32,16 @@ func (u *Usecases) GenerateNewAdd(curr string) (string, error) {
 	}
 	log.Printf("Using secret password: %s", os.Getenv("SECRET_PASSWORD"))
 
-	encryptedKey, err := u.EncryptAESGCM(password, derKey)
+	encryptedKey, nonce, err := u.EncryptAESGCM(password, derKey)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	encryptedKeyBase64 := base64.StdEncoding.EncodeToString(encryptedKey)
-
 	data := repository.DataToSave{
-		PrivateKey: encryptedKeyBase64,
+		PrivateKey: encryptedKey,
 		Address:    publicAddres,
 		Currency:   curr,
+		Nonce:      nonce,
 	}
 
 	err = u.Repository.SaveNewAddrToDB(data)

@@ -6,13 +6,7 @@ import (
 	"net/http"
 )
 
-type PostReqData struct {
-	Currency string `json:"currency"`
-	Address  string `json:"address"`
-	Amount   string `json:"amount"`
-}
-
-func (h *Handler) GetNewAddr(c *gin.Context) {
+func (h *Handler) Withdraw(c *gin.Context) {
 	var req PostReqData
 
 	log.Println("Received POST request")
@@ -24,7 +18,7 @@ func (h *Handler) GetNewAddr(c *gin.Context) {
 
 	log.Printf("Decoded request: %+v", req)
 
-	address, err := h.Runner.Ucase.GenerateNewAdd(req.Currency)
+	err := h.Runner.Ucase.Withdraw(req.Address, req.Amount)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
@@ -32,13 +26,13 @@ func (h *Handler) GetNewAddr(c *gin.Context) {
 		log.Fatal(err)
 	}
 
-	//SAIVING DATA TO GIN CONTEXT
-
-	c.Set("generated_address", address)
-	c.Set("currency", req.Currency)
+	id, err := h.Runner.Ucase.GenerateWithdrawID()
+	if err != nil {
+		log.Fatalf("Error generating withdraw ID: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Address created successfully",
-		"address": address,
+		"message": "You have successfully withdrawn money, your id:",
+		"id":      id,
 	})
 }

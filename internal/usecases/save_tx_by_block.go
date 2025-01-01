@@ -51,7 +51,7 @@ func (u *Usecases) SaveTxInfoByBlock(addr string, curr string) error {
 		}
 
 		if toAddr == addr {
-			data := repository.TxData{
+			data := repository.Params{
 				Hash:     tx.Hash().Hex(),
 				FromAddr: senderAddr.String(),
 				ToAddr:   toAddr,
@@ -63,13 +63,14 @@ func (u *Usecases) SaveTxInfoByBlock(addr string, curr string) error {
 				log.Fatalf("Error saiving data in db: %v", err)
 			}
 
-			log.Println("Tx data saved to DB")
+			log.Println("Tx data saved to DB***************************************************")
 
 			//AFTER SAIVING TX DATA IN DB WE JUST MERGE ALL COINS TO ROOT ADDRESS
 			err = u.MergeCoinsToRoot(data)
 			if err != nil {
 				return err
 			}
+			log.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
 
 		}
 	}

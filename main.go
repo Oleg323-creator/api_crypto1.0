@@ -20,7 +20,7 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+		fmt.Errorf("Error loading .env file: %v", err)
 	}
 
 	cfg := db.ConnectionConfig{
@@ -71,6 +71,8 @@ func main() {
 	router.Use(gin.Recovery())
 
 	router.POST("/create/address", handler.GetNewAddr)
+	router.GET("/get/tx/list", handler.GetTxList)
+	router.POST("/withdraw", handler.Withdraw)
 
 	go func() {
 		err = router.Run(":8080")

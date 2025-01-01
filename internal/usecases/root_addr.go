@@ -4,7 +4,6 @@ import (
 	"api_crypto1.0/internal/db/repository"
 	"context"
 	"crypto/x509"
-	"encoding/base64"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -35,35 +34,38 @@ func (u *Usecases) CheckRootAddrInDB() (string, error) {
 func (u *Usecases) GenerateRootAddr() (string, error) {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+		return "", fmt.Errorf("Error loading .env file: %v", err)
 	}
 
-	privateKey, err := crypto.GenerateKey()
+	privateKey1, err := crypto.GenerateKey()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	publicAddres := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+	privateKey := crypto.FromECDSA(privateKey1)
+
+	log.Printf("PRIVATE KEY1: %x", privateKey)
+
+	publicAddres := crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
 	log.Printf("Public address: %s", publicAddres)
 
 	// CONVERT KEY TO DER FORMAT
-	derKey := crypto.FromECDSA(privateKey)
+	derKey := crypto.FromECDSA(privateKey1)
 
 	password := []byte(os.Getenv("SECRET_PASSWORD"))
-	if os.Getenv("SECRET_PASSWORD") == "" {
-		log.Fatal("Error getting secret password from .env")
+	if len(password) == 0 {
+		return "", fmt.Errorf("SECRET_PASSWORD is not set in .env")
 	}
 
-	encryptedKey, err := u.EncryptAESGCM(password, derKey)
+	encryptedKey, nonce, err := u.EncryptAESGCM(password, derKey)
 	if err != nil {
 		log.Fatalf("Error encrypting key: %v", err)
 	}
 
-	encryptedKeyBase64 := base64.StdEncoding.EncodeToString(encryptedKey)
-
 	data := repository.DataToSave{
-		PrivateKey: encryptedKeyBase64,
+		PrivateKey: encryptedKey,
 		Address:    publicAddres,
+		Nonce:      nonce,
 	}
 
 	err = u.Repository.SaveRootAddrToDB(data)
@@ -74,7 +76,7 @@ func (u *Usecases) GenerateRootAddr() (string, error) {
 	return publicAddres, nil
 }
 
-func (u *Usecases) MergeCoinsToRoot(data repository.TxData) error {
+func (u *Usecases) MergeCoinsToRoot(data repository.Params) error {
 
 	fromAddress := data.ToAddr
 	toAddress, err := u.Repository.GetRootAddr()
@@ -106,21 +108,22 @@ func (u *Usecases) MergeCoinsToRoot(data repository.TxData) error {
 	tx := types.NewTransaction(nonce, common.HexToAddress(toAddress), bigIntAmount, gasLimit, gasPrice, nil)
 
 	password := []byte(os.Getenv("SECRET_PASSWORD"))
-	if os.Getenv("SECRET_PASSWORD") == "" {
-		log.Fatal("Error getting secret password from .env")
+	if len(password) != 32 {
+		log.Fatalf("Password length should be 32 bytes. Got: %d", len(password))
 	}
+
 	log.Printf("Using secret password: %s", os.Getenv("SECRET_PASSWORD"))
 
-	privateKeyToDecription, err := u.Repository.GetPrivateKeyFromDB(fromAddress)
+	privateKeyToDecription, nonc, err := u.Repository.GetPrivateKeyFromDB(fromAddress)
 
-	privateKey, err := u.DecryptAESGCM(password, []byte(privateKeyToDecription))
+	privateKey, err := u.DecryptAESGCM(nonc, privateKeyToDecription, password)
 	if err != nil {
 		return fmt.Errorf("Errore decription private key: %v", err)
 	}
 
 	privateKeyInCorrType, err := x509.ParseECPrivateKey(privateKey)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to parse private key: %v", err)
 	}
 
 	signedTx, err := types.SignTx(tx, types.NewEIP2930Signer(big.NewInt(11155111)), privateKeyInCorrType)
@@ -134,6 +137,7 @@ func (u *Usecases) MergeCoinsToRoot(data repository.TxData) error {
 	}
 
 	log.Printf("Tx has sent! Hash: %s\n", signedTx.Hash().Hex())
+	log.Println("//////////////////////////////////////////////////////////////////////////////")
 
 	return nil
 }
