@@ -3,7 +3,6 @@ package usecases
 import (
 	"api_crypto1.0/internal/db/repository"
 	"context"
-	"crypto/x509"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -77,7 +76,7 @@ func (u *Usecases) GenerateRootAddr() (string, error) {
 }
 
 func (u *Usecases) MergeCoinsToRoot(data repository.Params) error {
-
+	log.Println("START MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	fromAddress := data.ToAddr
 	toAddress, err := u.Repository.GetRootAddr()
 	if err != nil {
@@ -86,12 +85,13 @@ func (u *Usecases) MergeCoinsToRoot(data repository.Params) error {
 	amount := data.Value
 
 	bigIntAmount := new(big.Int)
-
+	log.Println("2 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	if _, success := bigIntAmount.SetString(amount, 10); success {
 		fmt.Printf("BigInt value: %d", bigIntAmount)
 	} else {
 		fmt.Println("Failed to convert string to *big.Int")
 	}
+	log.Println("3 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
 	gasPrice, err := u.Client.SuggestGasPrice(context.Background())
 	if err != nil {
@@ -104,7 +104,7 @@ func (u *Usecases) MergeCoinsToRoot(data repository.Params) error {
 	}
 
 	gasLimit := uint64(21000)
-
+	log.Println("4 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	tx := types.NewTransaction(nonce, common.HexToAddress(toAddress), bigIntAmount, gasLimit, gasPrice, nil)
 
 	password := []byte(os.Getenv("SECRET_PASSWORD"))
@@ -112,25 +112,27 @@ func (u *Usecases) MergeCoinsToRoot(data repository.Params) error {
 		log.Fatalf("Password length should be 32 bytes. Got: %d", len(password))
 	}
 
-	log.Printf("Using secret password: %s", os.Getenv("SECRET_PASSWORD"))
+	log.Println("5 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
 	privateKeyToDecription, nonc, err := u.Repository.GetPrivateKeyFromDB(fromAddress)
-
+	log.Println("6 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	privateKey, err := u.DecryptAESGCM(nonc, privateKeyToDecription, password)
 	if err != nil {
 		return fmt.Errorf("Errore decription private key: %v", err)
 	}
+	log.Println("7 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
-	privateKeyInCorrType, err := x509.ParseECPrivateKey(privateKey)
+	privateKey2, err := crypto.ToECDSA(privateKey)
 	if err != nil {
-		return fmt.Errorf("failed to parse private key: %v", err)
+		log.Fatalf("Ошибка при преобразовании ключа: %v", err)
 	}
 
-	signedTx, err := types.SignTx(tx, types.NewEIP2930Signer(big.NewInt(11155111)), privateKeyInCorrType)
+	log.Println("8 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	signedTx, err := types.SignTx(tx, types.NewEIP2930Signer(big.NewInt(11155111)), privateKey2)
 	if err != nil {
 		log.Fatalf("Error singing tx: %v", err)
 	}
-
+	log.Println("9 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	err = u.Client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		log.Fatalf("Error sending tx: %v", err)
