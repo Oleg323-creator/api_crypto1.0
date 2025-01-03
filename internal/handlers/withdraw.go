@@ -28,6 +28,6 @@ func (h *Handler) Withdraw(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "You have successfully withdrawn money, your hash:",
-		"id":      hash,
+		"hash":    hash,
 	})
 }
