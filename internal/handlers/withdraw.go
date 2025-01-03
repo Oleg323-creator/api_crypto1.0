@@ -18,7 +18,7 @@ func (h *Handler) Withdraw(c *gin.Context) {
 
 	log.Printf("Decoded request: %+v", req)
 
-	err := h.Runner.Ucase.Withdraw(req.Address, req.Amount)
+	hash, err := h.Runner.Ucase.Withdraw(req.Address, req.Amount)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
@@ -26,13 +26,8 @@ func (h *Handler) Withdraw(c *gin.Context) {
 		log.Fatal(err)
 	}
 
-	id, err := h.Runner.Ucase.GenerateWithdrawID()
-	if err != nil {
-		log.Fatalf("Error generating withdraw ID: %v", err)
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"message": "You have successfully withdrawn money, your id:",
-		"id":      id,
+		"message": "You have successfully withdrawn money, your hash:",
+		"id":      hash,
 	})
 }

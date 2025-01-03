@@ -58,7 +58,7 @@ func (r *Runner) BLockListener(addr string, curr string) {
 
 				log.Printf("Last released block: %d", lastReleasedBlock.Number().Int64())
 
-				err = r.Ucase.SaveTxInfoByBlock(addr, curr)
+				err = r.Ucase.SaveTxDataByBlock(addr, curr)
 				if err != nil {
 					fmt.Errorf("Error getting tx data: %v", err)
 				}
@@ -72,7 +72,7 @@ func (r *Runner) BLockListener(addr string, curr string) {
 				}
 
 			}
-			log.Println("4")
+			log.Println("Listening is OK")
 
 			lastBlockInDB = lastReleasedBlock.Number().Int64()
 			time.Sleep(2 * time.Second)

@@ -4,5 +4,6 @@ CREATE TABLE transactions (
                               from_addr VARCHAR(100),
                               to_addr VARCHAR(100),
                               value VARCHAR(255),
-                              currency VARCHAR(100)
+                              currency VARCHAR(100),
+                              tx_type VARCHAR(42)
 );

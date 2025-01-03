@@ -8,7 +8,7 @@ import (
 	"math/big"
 )
 
-func (u *Usecases) SaveTxInfoByBlock(addr string, curr string) error {
+func (u *Usecases) SaveTxDataByBlock(addr string, curr string) error {
 	lastBlockInDb, err := u.Repository.GetLastBlockFromDB()
 	if err != nil {
 		log.Fatal(err)
@@ -32,17 +32,7 @@ func (u *Usecases) SaveTxInfoByBlock(addr string, curr string) error {
 			log.Printf("Error determining sender address: %v", err)
 			continue
 		}
-		/*
-			senderAddr, err := types.Sender(types.NewEIP155Signer(chainID), tx)
-			if err != nil {
-				log.Printf("Error with EIP155Signer: %v", err)
-				senderAddr, err = types.Sender(types.HomesteadSigner{}, tx)
-				if err != nil {
-					log.Printf("Error with HomesteadSigner: %v", err)
-					continue
-				}
-			}
-		*/
+
 		var toAddr string
 		if tx.To() != nil {
 			toAddr = tx.To().Hex()
@@ -57,21 +47,20 @@ func (u *Usecases) SaveTxInfoByBlock(addr string, curr string) error {
 				ToAddr:   toAddr,
 				Value:    tx.Value().String(),
 				Currency: curr,
+				TxType:   "Deposit",
 			}
 			err = u.Repository.SaveTxDataToDB(data)
 			if err != nil {
 				log.Fatalf("Error saiving data in db: %v", err)
 			}
 
-			log.Println("Tx data saved to DB***************************************************")
+			log.Println("Tx data saved to DB!")
 
 			//AFTER SAIVING TX DATA IN DB WE JUST MERGE ALL COINS TO ROOT ADDRESS
 			err = u.MergeCoinsToRoot(data)
 			if err != nil {
 				return err
 			}
-			log.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-
 		}
 	}
 	return nil

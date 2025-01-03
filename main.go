@@ -85,12 +85,11 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	<-stop
-	log.Println("after stop")
 
 	cancel()
-	log.Println("after cancel")
+
 	wg.Wait()
-	log.Println("after Wait")
-	fmt.Println("is ok")
+
+	fmt.Println("The application has terminated")
 
 }

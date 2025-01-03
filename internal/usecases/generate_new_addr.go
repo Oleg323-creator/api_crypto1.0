@@ -10,7 +10,7 @@ import (
 )
 
 func (u *Usecases) GenerateNewAdd(curr string) (string, error) {
-	err := godotenv.Load("/home/oleh/GolandProjects/api_crypto/.env")
+	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
@@ -23,7 +23,6 @@ func (u *Usecases) GenerateNewAdd(curr string) (string, error) {
 	publicAddres := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
 	fmt.Printf("Public address: %s", publicAddres)
 
-	// CONVERT KEY TO DER FORMAT
 	derKey := crypto.FromECDSA(privateKey)
 
 	password := []byte(os.Getenv("SECRET_PASSWORD"))
@@ -44,7 +43,7 @@ func (u *Usecases) GenerateNewAdd(curr string) (string, error) {
 		Nonce:      nonce,
 	}
 
-	err = u.Repository.SaveNewAddrToDB(data)
+	err = u.Repository.SaveNewAddr(data)
 	if err != nil {
 		return "", fmt.Errorf("Error saiving new addr to DB: %v", err)
 	}

@@ -14,7 +14,7 @@ type DataToSave struct {
 	Nonce      string
 }
 
-func (r *Repository) SaveNewAddrToDB(data DataToSave) error {
+func (r *Repository) SaveNewAddr(data DataToSave) error {
 	queryBuilder := squirrel.Insert("addresses").
 		Columns("private_key", "address", "Currency", "Nonce").
 		Values(data.PrivateKey, data.Address, data.Currency, data.Nonce)
@@ -33,7 +33,7 @@ func (r *Repository) SaveNewAddrToDB(data DataToSave) error {
 	return nil
 }
 
-func (r *Repository) GetAllAddrFromDB() ([]string, []string, error) {
+func (r *Repository) GetAllAddr() ([]string, []string, error) {
 	queryBuilder := squirrel.Select("address", "currency").
 		From("addresses")
 
@@ -70,7 +70,7 @@ func (r *Repository) GetAllAddrFromDB() ([]string, []string, error) {
 	return addresses, currencyes, nil
 }
 
-func (r *Repository) GetPrivateKeyFromDB(addr string) (string, string, error) {
+func (r *Repository) GetPrivateKey(addr string) (string, string, error) {
 	queryBuilder := squirrel.Select("private_key", "nonce").
 		From("addresses").
 		Where(squirrel.Eq{"address": addr})

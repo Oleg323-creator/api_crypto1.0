@@ -14,6 +14,7 @@ type Params struct {
 	ToAddr   string `form:"to_addr" json:"to_addr"`
 	Value    string `form:"value" json:"value"`
 	Currency string `from:"currency" json:"currency"`
+	TxType   string ` form:"tx_type" json:"tx_type"`
 	Page     int    `form:"page" json:"page"`
 	Limit    int    `form:"limit" json:"limit"`
 	ID       int    `form:"id" json:"id"`
@@ -23,8 +24,8 @@ type Params struct {
 
 func (r *Repository) SaveTxDataToDB(data Params) error {
 	queryBuilder := squirrel.Insert("transactions").
-		Columns("hash", "from_addr", "to_addr", "value", "currency").
-		Values(data.Hash, data.FromAddr, data.ToAddr, data.Value, data.Currency).
+		Columns("hash", "from_addr", "to_addr", "value", "currency", "tx_type").
+		Values(data.Hash, data.FromAddr, data.ToAddr, data.Value, data.Currency, data.TxType).
 		Suffix("ON CONFLICT (hash) DO NOTHING")
 
 	query, args, err := queryBuilder.PlaceholderFormat(squirrel.Dollar).ToSql()
@@ -47,6 +48,7 @@ type ResponseParams struct {
 	ToAddr   string `form:"to_addr" json:"to_addr"`
 	Value    string `form:"value" json:"value"`
 	Currency string `from:"currency" json:"currency"`
+	TxType   string `form:"tx_type" json:"tx_type"`
 	ID       int    `form:"id" json:"id"`
 }
 
@@ -54,11 +56,14 @@ func (r *Repository) GetTxFromDB(params Params) ([]ResponseParams, error) {
 
 	offset := (params.Page - 1) * params.Limit
 
-	queryBuilder := squirrel.Select("hash", "from_addr", "to_addr", "value", "currency", "id").
+	queryBuilder := squirrel.Select("tx_type", "from_addr", "to_addr", "value", "currency", "id", "hash").
 		From("transactions").
 		Limit(uint64(params.Limit)).
 		Offset(uint64(offset))
 
+	if params.TxType != "" {
+		queryBuilder = queryBuilder.Where(squirrel.Like{"tx_type": "%" + params.FromAddr + "%"})
+	}
 	if params.FromAddr != "" {
 		queryBuilder = queryBuilder.Where(squirrel.Like{"from_addr": "%" + params.FromAddr + "%"})
 	}
@@ -93,7 +98,7 @@ func (r *Repository) GetTxFromDB(params Params) ([]ResponseParams, error) {
 	// GETTING RESULTS
 	for rows.Next() {
 		var rate ResponseParams
-		if err = rows.Scan(&rate.Hash, &rate.FromAddr, &rate.ToAddr, &rate.Value, &rate.Currency, &rate.ID); err != nil {
+		if err = rows.Scan(&rate.TxType, &rate.FromAddr, &rate.ToAddr, &rate.Value, &rate.Currency, &rate.ID, &rate.Hash); err != nil {
 			log.Fatal(err)
 		}
 

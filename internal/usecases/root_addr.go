@@ -4,6 +4,7 @@ import (
 	"api_crypto1.0/internal/db/repository"
 	"context"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -18,7 +19,7 @@ func (u *Usecases) CheckRootAddrInDB() (string, error) {
 
 	addr, err := u.Repository.GetRootAddr()
 	if err != nil {
-		//	log.Printf("No root address in db, creating new addr: %v", err)
+		log.Printf("No root address in db, creating new addr: %v", err)
 		addr, err = u.GenerateRootAddr()
 		if err != nil {
 			return "", fmt.Errorf("Error generating new root address: %v", err)
@@ -36,20 +37,15 @@ func (u *Usecases) GenerateRootAddr() (string, error) {
 		return "", fmt.Errorf("Error loading .env file: %v", err)
 	}
 
-	privateKey1, err := crypto.GenerateKey()
+	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	privateKey := crypto.FromECDSA(privateKey1)
-
-	log.Printf("PRIVATE KEY1: %x", privateKey)
-
-	publicAddres := crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
+	publicAddres := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
 	log.Printf("Public address: %s", publicAddres)
 
-	// CONVERT KEY TO DER FORMAT
-	derKey := crypto.FromECDSA(privateKey1)
+	derKey := crypto.FromECDSA(privateKey)
 
 	password := []byte(os.Getenv("SECRET_PASSWORD"))
 	if len(password) == 0 {
@@ -67,7 +63,7 @@ func (u *Usecases) GenerateRootAddr() (string, error) {
 		Nonce:      nonce,
 	}
 
-	err = u.Repository.SaveRootAddrToDB(data)
+	err = u.Repository.SaveRootData(data)
 	if err != nil {
 		return "", fmt.Errorf("Error saiving new addr to DB: %v", err)
 	}
@@ -76,70 +72,80 @@ func (u *Usecases) GenerateRootAddr() (string, error) {
 }
 
 func (u *Usecases) MergeCoinsToRoot(data repository.Params) error {
-	log.Println("START MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	log.Println("STARTING MERGING!")
 	fromAddress := data.ToAddr
 	toAddress, err := u.Repository.GetRootAddr()
 	if err != nil {
 		return err
 	}
-	amount := data.Value
 
-	bigIntAmount := new(big.Int)
-	log.Println("2 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-	if _, success := bigIntAmount.SetString(amount, 10); success {
-		fmt.Printf("BigInt value: %d", bigIntAmount)
-	} else {
-		fmt.Println("Failed to convert string to *big.Int")
+	balance, err := u.Client.BalanceAt(context.Background(), common.HexToAddress(fromAddress), nil)
+	if err != nil {
+		log.Fatalf("Error getting balance: %v", err)
 	}
-	log.Println("3 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+	toAddr := common.HexToAddress(toAddress)
+
+	msg := ethereum.CallMsg{
+		From: common.HexToAddress(fromAddress),
+		To:   &toAddr,
+		Gas:  0,
+		Data: nil,
+	}
+	gasLimit, err := u.Client.EstimateGas(context.Background(), msg)
+	if err != nil {
+		log.Fatalf("Error estimating gas: %v", err)
+	}
 
 	gasPrice, err := u.Client.SuggestGasPrice(context.Background())
 	if err != nil {
 		log.Fatalf("Error getting gas price: %v", err)
 	}
 
+	gasCost := new(big.Int).Mul(big.NewInt(int64(gasLimit)), gasPrice)
+
+	// CHECKING IF ENOUGH BALANCE
+	if balance.Cmp(gasCost) <= 0 {
+		log.Fatalf("Insufficient funds")
+	}
+
+	amountToSend := new(big.Int).Sub(balance, gasCost)
+
 	nonce, err := u.Client.PendingNonceAt(context.Background(), common.HexToAddress(fromAddress))
 	if err != nil {
 		log.Fatalf("Error getting nonce: %v", err)
 	}
 
-	gasLimit := uint64(21000)
-	log.Println("4 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-	tx := types.NewTransaction(nonce, common.HexToAddress(toAddress), bigIntAmount, gasLimit, gasPrice, nil)
+	tx := types.NewTransaction(nonce, common.HexToAddress(toAddress), amountToSend, gasLimit, gasPrice, nil)
 
 	password := []byte(os.Getenv("SECRET_PASSWORD"))
 	if len(password) != 32 {
 		log.Fatalf("Password length should be 32 bytes. Got: %d", len(password))
 	}
 
-	log.Println("5 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	privateKeyToDecription, nonc, err := u.Repository.GetPrivateKey(fromAddress)
 
-	privateKeyToDecription, nonc, err := u.Repository.GetPrivateKeyFromDB(fromAddress)
-	log.Println("6 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	privateKey, err := u.DecryptAESGCM(nonc, privateKeyToDecription, password)
 	if err != nil {
 		return fmt.Errorf("Errore decription private key: %v", err)
 	}
-	log.Println("7 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
-	privateKey2, err := crypto.ToECDSA(privateKey)
+	privateKeyConverted, err := crypto.ToECDSA(privateKey)
 	if err != nil {
-		log.Fatalf("Ошибка при преобразовании ключа: %v", err)
+		log.Fatalf("Error converting key: %v", err)
 	}
 
-	log.Println("8 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-	signedTx, err := types.SignTx(tx, types.NewEIP2930Signer(big.NewInt(11155111)), privateKey2)
+	signedTx, err := types.SignTx(tx, types.NewEIP2930Signer(big.NewInt(11155111)), privateKeyConverted)
 	if err != nil {
 		log.Fatalf("Error singing tx: %v", err)
 	}
-	log.Println("9 MERGING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
 	err = u.Client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		log.Fatalf("Error sending tx: %v", err)
 	}
 
 	log.Printf("Tx has sent! Hash: %s\n", signedTx.Hash().Hex())
-	log.Println("//////////////////////////////////////////////////////////////////////////////")
 
 	return nil
 }

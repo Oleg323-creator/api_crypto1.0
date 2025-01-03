@@ -7,9 +7,11 @@ import (
 	"time"
 )
 
+//USING THIS RUNNER FOR LISTENING TX FROM ALL ADRESSES WE HAVE WHEN WE RESTART THE APP
+
 func (r *Runner) RestartListeningAllAddr() error {
 	wg := &sync.WaitGroup{}
-	addr, curr, err := r.Ucase.Repository.GetAllAddrFromDB()
+	addr, curr, err := r.Ucase.Repository.GetAllAddr()
 	if err != nil {
 		return fmt.Errorf("Error getting adresses list from DB: %v", err)
 	}

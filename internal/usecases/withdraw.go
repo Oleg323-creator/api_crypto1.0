@@ -1,8 +1,8 @@
 package usecases
 
 import (
+	"api_crypto1.0/internal/db/repository"
 	"context"
-	"crypto/rand"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -12,11 +12,11 @@ import (
 	"os"
 )
 
-func (u *Usecases) Withdraw(addr string, amount string) error {
+func (u *Usecases) Withdraw(addr string, amount string) (string, error) {
 
 	fromAddress, err := u.Repository.GetRootAddr()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	toAddress := addr
@@ -47,28 +47,20 @@ func (u *Usecases) Withdraw(addr string, amount string) error {
 	if len(password) != 32 {
 		log.Fatalf("Password length should be 32 bytes. Got: %d", len(password))
 	}
-	log.Printf("Password length: %d", len(password))
 
 	privateKeyToDecription, nonc, err := u.Repository.GetRootPrivateKey(fromAddress)
 
 	privateKey, err := u.DecryptAESGCM(nonc, privateKeyToDecription, password)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt private key for address %s: %v", fromAddress, err)
+		return "", fmt.Errorf("failed to decrypt private key for address %s: %v", fromAddress, err)
 	}
-	log.Printf("PRIVATE KEY: %x", privateKey)
-	/*
-		privateKeyInCorrType, err := x509.ParseECPrivateKey(privateKey)
-		if err != nil {
-			return fmt.Errorf("failed to parse private key: %v", err)
-		}
-	*/
 
-	privateKey2, err := crypto.ToECDSA(privateKey)
+	privateKeyConverted, err := crypto.ToECDSA(privateKey)
 	if err != nil {
-		log.Fatalf("Ошибка при преобразовании ключа: %v", err)
+		log.Fatalf("Error converting key: %v", err)
 	}
 
-	signedTx, err := types.SignTx(tx, types.NewEIP2930Signer(big.NewInt(11155111)), privateKey2)
+	signedTx, err := types.SignTx(tx, types.NewEIP2930Signer(big.NewInt(11155111)), privateKeyConverted)
 	if err != nil {
 		log.Fatalf("Error singing tx: %v", err)
 	}
@@ -79,22 +71,45 @@ func (u *Usecases) Withdraw(addr string, amount string) error {
 	}
 
 	log.Printf("Money is comming to your address! Hash: %s\n", signedTx.Hash().Hex())
-	log.Println("................................................................") //ШОБ В ЛОГАХ ВЫДЕЛЯЛОСЬ
 
-	return nil
-}
-
-func (u *Usecases) GenerateWithdrawID() (int, error) {
-	minId := 10000000
-	maxId := 99999999
-
-	rangeSize := maxId - minId + 1
-
-	randomBigInt, err := rand.Int(rand.Reader, big.NewInt(int64(rangeSize)))
-	if err != nil {
-		return 0, err
+	if err = u.SaveTxDataToDbByHash(signedTx.Hash().Hex()); err != nil {
+		return "", fmt.Errorf(err.Error())
 	}
 
-	randomNumber := int(randomBigInt.Int64()) + minId
-	return randomNumber, nil
+	return signedTx.Hash().Hex(), nil
+}
+
+func (u *Usecases) SaveTxDataToDbByHash(hash string) error {
+	tx, _, err := u.Client.TransactionByHash(context.Background(), common.HexToHash(hash))
+	if err != nil {
+		return err
+	}
+
+	chainID, err := u.Client.NetworkID(context.Background())
+	if err != nil {
+		log.Fatalf("Error getting chain ID: %v", err)
+	}
+
+	signer := types.LatestSignerForChainID(chainID)
+	senderAddr, err := types.Sender(signer, tx)
+	if err != nil {
+		return err
+	}
+
+	data := repository.Params{
+		Hash:     tx.Hash().Hex(),
+		FromAddr: senderAddr.String(),
+		ToAddr:   tx.To().Hex(),
+		Value:    tx.Value().String(),
+		Currency: "ETH",
+		TxType:   "Withdraw",
+	}
+	err = u.Repository.SaveTxDataToDB(data)
+	if err != nil {
+		log.Fatalf("Error saiving data in db: %v", err)
+	}
+
+	log.Println("Tx data saved to DB")
+
+	return nil
 }

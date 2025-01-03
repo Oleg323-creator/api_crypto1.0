@@ -8,7 +8,7 @@ import (
 	"log"
 )
 
-func (r *Repository) SaveRootAddrToDB(data DataToSave) error {
+func (r *Repository) SaveRootData(data DataToSave) error {
 	queryBuilder := squirrel.Insert("root_address").
 		Columns("private_key", "address", "nonce").
 		Values(data.PrivateKey, data.Address, data.Nonce)
