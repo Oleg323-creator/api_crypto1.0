@@ -72,14 +72,15 @@ func (u *Usecases) Withdraw(addr string, amount string) (string, error) {
 
 	log.Printf("Money is comming to your address! Hash: %s\n", signedTx.Hash().Hex())
 
-	if err = u.SaveTxDataToDbByHash(signedTx.Hash().Hex()); err != nil {
+	if err = u.SaveTxDataToDbByHash(signedTx.Hash().Hex(), bigIntAmount.String()); err != nil {
 		return "", fmt.Errorf(err.Error())
 	}
 
 	return signedTx.Hash().Hex(), nil
 }
 
-func (u *Usecases) SaveTxDataToDbByHash(hash string) error {
+func (u *Usecases) SaveTxDataToDbByHash(hash string, amount string) error {
+
 	tx, _, err := u.Client.TransactionByHash(context.Background(), common.HexToHash(hash))
 	if err != nil {
 		return err
@@ -100,7 +101,7 @@ func (u *Usecases) SaveTxDataToDbByHash(hash string) error {
 		Hash:     tx.Hash().Hex(),
 		FromAddr: senderAddr.String(),
 		ToAddr:   tx.To().Hex(),
-		Value:    tx.Value().String(),
+		Value:    amount,
 		Currency: "ETH",
 		TxType:   "Withdraw",
 	}
